@@ -1,0 +1,51 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:tools="http://schemas.android.com/tools"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+              android:padding="20dp"
+                tools:context=".MainActivity">
+
+  <TextView
+      android:id="@+id/srcTv"
+      android:textSize="18sp"
+      android:text="@string/hello_reactivex"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"/>
+  <View
+      android:layout_width="match_parent"
+      android:layout_height="1dp"
+      android:background="#DDD"/>
+
+  <Spinner
+      android:id="@+id/spinner"
+      android:layout_marginTop="10dp"
+      android:layout_marginBottom="10dp"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:entries="@android:array/organizationTypes">
+
+  </Spinner>
+  <View
+      android:layout_width="match_parent"
+      android:layout_height="1dp"
+      android:background="#DDD"/>
+  <TextView
+      android:id="@+id/resultTv"
+      android:text="results"
+      android:textSize="18sp"
+      android:layout_marginTop="10dp"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"/>
+  <View
+      android:layout_width="match_parent"
+      android:layout_height="1dp"
+      android:background="#DDD"/>
+  <TextView
+      android:id="@+id/timestamp"
+      android:textSize="12sp"
+      android:textColor="@android:color/holo_red_light"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"/>
+
+</LinearLayout>
