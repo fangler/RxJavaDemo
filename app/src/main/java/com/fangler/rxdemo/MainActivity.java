@@ -12,6 +12,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.fangler.rxdemo.hook.RxJavaObservableSelfHook;
+import com.google.gson.internal.LinkedHashTreeMap;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -30,10 +31,14 @@ import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.functions.Func2;
 import rx.plugins.RxJavaPlugins;
 import rx.schedulers.Schedulers;
 import rx.subscriptions.CompositeSubscription;
 
+/**
+ * Created by fangler on 2015/11/2.
+ */
 public class MainActivity extends AppCompatActivity {
 
   private static final String TAG = "MainActivity";
@@ -49,9 +54,9 @@ public class MainActivity extends AppCompatActivity {
   private StringBuilder resultText = new StringBuilder();
   private long timestamp;
 
-  private static Map<String, Func1<Observable, Observable>> map = new HashMap<>();
+  private static Map<String, Func1<Observable, Observable>> map = new LinkedHashTreeMap<>();
 
-  private Observable one2EightObservable/* = Observable.range(0, 9, Schedulers.io())*/;
+  private Observable one2EightObservable= null;
   private final CompositeSubscription compositeSubscription = new CompositeSubscription();
 
   @Override
@@ -60,10 +65,16 @@ public class MainActivity extends AppCompatActivity {
     setContentView(R.layout.activity_main);
     ButterKnife.bind(this);
 
-    hookObservable();
-//    one2EightObservable = Observable.range(0, 9, Schedulers.io());
+    hookObservable(true);//打开hook
+    /*
+     * 测试subscrbeOn和observeOn，如不需要可以注释。
+     */
+//    subscribeTwice();
 
-//    initMap();
+    hookObservable(false); //关闭hook
+
+    one2EightObservable = Observable.range(0, 9, Schedulers.io());
+    initMap();
     srcText = Arrays.toString(srcList);
     srcTv.setText(srcText);
 
@@ -82,61 +93,20 @@ public class MainActivity extends AppCompatActivity {
       }
     });
 
-
-    subscribeTwice();
-
-//        .subscribeOn(Schedulers.io())
-//        .subscribeOn(Schedulers.newThread())
-//        .lift(new Observable.Operator<String, String>() {
-//          @Override
-//          public Subscriber<? super String> call(final Subscriber<? super String> subscriber) {
-//            return new Subscriber<String>() {
-//              @Override public void onCompleted() {
-//                subscriber.onCompleted();
-//              }
-//
-//              @Override public void onError(Throwable e) {
-//                subscriber.onError(e);
-//              }
-//
-//              @Override public void onNext(String s) {
-//                subscriber.onNext(s + "1");
-//                Log.d(TAG, "Producer.. in " + Thread.currentThread().getName());
-//                Log.d(TAG, "onNext = " + s);
-//              }
-//            };
-//          }
-//        })
-////        .subscribeOn(Schedulers.newThread())
-////        .subscribeOn(Schedulers.io())
-////        .subscribeOn(Schedulers.io())
-//        .subscribeOn(Schedulers.io())
-//        .observeOn(AndroidSchedulers.mainThread())
-////        .observeOn(Schedulers.newThread())
-////        .observeOn(Schedulers.newThread())
-////        .observeOn(Schedulers.newThread())
-//        .subscribe(new Subscriber<String>() {
-//          @Override public void onCompleted() {
-//
-//          }
-//
-//          @Override public void onError(Throwable e) {
-//
-//          }
-//
-//          @Override public void onNext(String s) {
-//            Log.d(TAG, "Consumer in " + Thread.currentThread().getName());
-//            Log.d(TAG, "onNext = " + s);
-//          }
-//        });
   }
 
+  /**
+   * used for {@see subscribeOne, subscribeTwo, subscribeTwice}.
+   */
   Action1<String> action1 = new Action1<String>() {
     @Override public void call(String s) {
       Log.d(TAG, "Consumer in " + Thread.currentThread().getName());
     }
   };
 
+  /**
+   * 一次subscribeOn在io线程，一次observeOn在main线程
+   */
   private Subscription subscribeOne() {
     return Observable.create(new Observable.OnSubscribe<String>() {
       @Override public void call(Subscriber<? super String> subscriber) {
@@ -148,6 +118,9 @@ public class MainActivity extends AppCompatActivity {
     }).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread()).subscribe(action1);
   }
 
+  /**
+   * 一次subscribeOn在io线程，一次subscribeOn在新的线程，一次observeOn在main线程
+   */
   private Subscription subscribeTwo() {
     return Observable.create(new Observable.OnSubscribe<String>() {
       @Override public void call(Subscriber<? super String> subscriber) {
@@ -160,6 +133,10 @@ public class MainActivity extends AppCompatActivity {
         .observeOn(AndroidSchedulers.mainThread()).subscribe(action1);
   }
 
+  /**
+   * 一次subscribeOn在io线程，一次observeOn在主线程，
+   * 一次subscribeOn在新的线程，一次observeOn在新的线程
+   */
   private Subscription subscribeTwice() {
     return Observable.create(new Observable.OnSubscribe<String>() {
       @Override public void call(Subscriber<? super String> subscriber) {
@@ -172,7 +149,10 @@ public class MainActivity extends AppCompatActivity {
         .observeOn(Schedulers.newThread()).subscribe(action1);
   }
 
-  private void hookObservable() {
+  /**
+   * use a self {@link RxJavaObservableSelfHook}
+   */
+  private void hookObservable(boolean hookIt) {
     RxJavaPlugins instance = RxJavaPlugins.getInstance();
     Class clazz = instance.getClass();
     Method method = null;
@@ -185,7 +165,9 @@ public class MainActivity extends AppCompatActivity {
       try {
         method.setAccessible(true);
         method.invoke(instance);
-        instance.registerObservableExecutionHook(new RxJavaObservableSelfHook());
+        if(hookIt) {
+          instance.registerObservableExecutionHook(new RxJavaObservableSelfHook());
+        }
       } catch (IllegalAccessException e) {
         e.printStackTrace();
       } catch (InvocationTargetException e) {
@@ -194,6 +176,11 @@ public class MainActivity extends AppCompatActivity {
     }
   }
 
+  /**
+   *
+   * @param src
+   * @return a list of keys from the {@param src}
+   */
   private List<String> getKeyList(Map<String, Func1<Observable, Observable>> src) {
     List<String> keys = new ArrayList<>();
     for (String tmp : src.keySet()) {
@@ -202,6 +189,9 @@ public class MainActivity extends AppCompatActivity {
     return keys;
   }
 
+  /**
+   * init the map
+   */
   private void initMap() {
     map.put("take(5)", new Func1<Observable, Observable>() {
       @Override public Observable call(Observable observable) {
@@ -215,8 +205,52 @@ public class MainActivity extends AppCompatActivity {
       }
     });
 
+    map.put("merge", new Func1<Observable, Observable>() {
+      @Override public Observable call(Observable observable) {
+        return observable.mergeWith(Observable.create(new Observable.OnSubscribe<Subscriber>() {
+          @Override public void call(Subscriber o) {
+            o.onNext(11);
+            o.onNext(21);
+            o.onNext(31);
+            o.onCompleted();
+          }
+        }));
+      }
+    });
+
+    map.put("scan", new Func1<Observable, Observable>() {
+      @Override public Observable call(Observable observable) {
+        return observable.scan(new Func2<Integer, Integer, Integer>() {
+          @Override public Integer call(Integer o, Integer o2) {
+            return o + o2;
+          }
+        });
+      }
+    });
+
+    map.put("starWith(-1)", new Func1<Observable, Observable>() {
+      @Override public Observable call(Observable observable) {
+        return observable.startWith(-1);
+      }
+    });
+
+    map.put("last", new Func1<Observable, Observable>() {
+      @Override public Observable call(Observable observable) {
+        return observable.last();
+      }
+    });
+
+    map.put("skip(2)", new Func1<Observable, Observable>() {
+      @Override public Observable call(Observable observable) {
+        return observable.skip(2);
+      }
+    });
+
   }
 
+  /**
+   * @return Subscriber 处理map中对应的Observabal
+   */
   private final Subscriber<Integer> produceSubscirber() {
     return new Subscriber<Integer>() {
       @Override public void onStart() {
@@ -244,6 +278,9 @@ public class MainActivity extends AppCompatActivity {
     };
   }
 
+  /**
+   * 一个Transformer来在主线程观察结果
+   */
   private final Observable.Transformer scheduleTransformer = new Observable.Transformer() {
     @Override public Object call(Object o) {
       return ((Observable) o).observeOn(AndroidSchedulers.mainThread());
